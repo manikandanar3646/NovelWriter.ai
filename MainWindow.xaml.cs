@@ -1,4 +1,6 @@
-﻿using AI_Novel_writing_System;
+﻿using AI_Novel_writing_System.Data;
+using AI_Novel_writing_System.Models;
+using AI_Novel_writing_System;
 using System;
 using System.Threading.Tasks;
 using System.Windows;
@@ -8,15 +10,37 @@ namespace darkFanNovel
     public partial class MainWindow : Window
     {
         private string currentMode = "creative";
-
         private IAIService? aiService;
+
+        private readonly DatabaseService databaseService;
+        private readonly NovelRepository novelRepository;
+        private readonly ChapterRepository chapterRepository;
+        private readonly CharacterRepository characterRepository;
 
         public MainWindow()
         {
             InitializeComponent();
 
-            // Default provider
+            // ============================
+            // AI
+            // ============================
+
             aiService = new OllamaAIService();
+
+            // ============================
+            // DATABASE
+            // ============================
+
+            databaseService = new DatabaseService();
+
+            novelRepository =
+                new NovelRepository(databaseService);
+
+            chapterRepository =
+                new ChapterRepository(databaseService);
+
+            characterRepository =
+                new CharacterRepository(databaseService);
         }
 
         // ============================
