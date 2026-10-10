@@ -1,9 +1,12 @@
 using AI_Novel_writing_System.Data;
 using AI_Novel_writing_System.Models;
-using AI_Novel_writing_System.Services;
+using darkFanNovel;
+using System;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Media;
 
 namespace AI_Novel_writing_System;
@@ -21,13 +24,13 @@ public partial class MainWindow : Window
     private IAIService _ai = new OllamaAIService();
 
     private bool _loading;
-    private bool _isOpenAI;
+    private bool _openAISelected;
     private string _apiKey = "";
-    private string _mode = "creative";
-    private string _lastSavedText = "";
+    private string _writingMode = "creative";
+    private string _savedText = "";
 
-    private readonly Stack<string> _undo = new();
-    private readonly Stack<string> _redo = new();
+    private readonly System.Collections.Generic.Stack<string> _undo = new();
+    private readonly System.Collections.Generic.Stack<string> _redo = new();
 
     public MainWindow()
     {
@@ -39,17 +42,19 @@ public partial class MainWindow : Window
         _notes = new StoryNoteRepository(_database);
 
         LoadNovels();
-        UpdateWordCount();
+        AddChatMessage("MythForge",
+            "Your writing companion is ready. Select a novel or create one to begin.");
     }
 
-    private void LoadNovels(int selectId = 0)
+    private void LoadNovels(int preferredId = 0)
     {
         _loading = true;
 
-        var novels = _novels.GetAll();
-        NovelSelector.ItemsSource = novels;
-        NovelSelector.SelectedItem = novels.FirstOrDefault(
-            n => n.Id == selectId) ?? novels.FirstOrDefault();
+        var items = _novels.GetAll();
+        NovelSelector.ItemsSource = items;
+        NovelSelector.SelectedItem =
+            items.FirstOrDefault(n => n.Id == preferredId)
+            ?? items.FirstOrDefault();
 
         _loading = false;
 
@@ -58,10 +63,13 @@ public partial class MainWindow : Window
         else
         {
             _currentNovel = null;
+            _currentChapter = null;
             ChapterList.ItemsSource = null;
             ManuscriptEditor.Clear();
             CurrentChapterTitle.Text = "Create a novel to begin";
             ChapterSubheading.Text = "No novel selected";
+            _savedText = "";
+            UpdateWordCount();
         }
     }
 
@@ -70,11 +78,11 @@ public partial class MainWindow : Window
         _currentNovel = novel;
 
         _loading = true;
-        ChapterList.ItemsSource = _chapters.GetByNovel(novel.Id);
-        ChapterList.SelectedIndex = ChapterList.Items.Count > 0 ? 0 : -1;
+        var chapters = _chapters.GetByNovelId(novel.Id);
+        ChapterList.ItemsSource = chapters;
+        ChapterList.SelectedItem = chapters.FirstOrDefault();
+        ChapterSubheading.Text = $"{chapters.Count} chapters";
         _loading = false;
-
-        ChapterSubheading.Text = $"{ChapterList.Items.Count} chapters";
 
         if (ChapterList.SelectedItem is Chapter chapter)
             LoadChapter(chapter);
@@ -83,7 +91,7 @@ public partial class MainWindow : Window
             _currentChapter = null;
             ManuscriptEditor.Clear();
             CurrentChapterTitle.Text = novel.Title;
-            _lastSavedText = "";
+            _savedText = "";
             UpdateWordCount();
         }
     }
@@ -93,24 +101,34 @@ public partial class MainWindow : Window
         _currentChapter = chapter;
 
         _loading = true;
-        ManuscriptEditor.Text = chapter.Content;
+        ManuscriptEditor.Text = chapter.Content ?? "";
         CurrentChapterTitle.Text =
             $"Chapter {chapter.ChapterNumber} — {chapter.Title}";
-        _lastSavedText = chapter.Content;
+        _savedText = ManuscriptEditor.Text;
         _undo.Clear();
         _redo.Clear();
         _loading = false;
 
         SaveStatusLabel.Text = "Saved";
-        AutosaveLabel.Text = "♧  Loaded from LiteDB";
+        AutosaveLabel.Text = "●  Loaded from LiteDB";
         UpdateWordCount();
     }
 
     private void NovelSelector_SelectionChanged(
         object sender, SelectionChangedEventArgs e)
     {
-        if (!_loading && NovelSelector.SelectedItem is Novel novel)
-            LoadNovel(novel);
+        if (_loading || NovelSelector.SelectedItem is not Novel novel)
+            return;
+
+        if (!ConfirmUnsavedChanges())
+        {
+            _loading = true;
+            NovelSelector.SelectedItem = _currentNovel;
+            _loading = false;
+            return;
+        }
+
+        LoadNovel(novel);
     }
 
     private void ChapterList_SelectionChanged(
@@ -133,7 +151,7 @@ public partial class MainWindow : Window
     private bool ConfirmUnsavedChanges()
     {
         if (_currentChapter == null ||
-            ManuscriptEditor.Text == _lastSavedText)
+            ManuscriptEditor.Text == _savedText)
             return true;
 
         var answer = MessageBox.Show(
@@ -154,14 +172,26 @@ public partial class MainWindow : Window
     private void SaveCurrentChapter()
     {
         if (_currentChapter == null)
+        {
+            MessageBox.Show("Create or select a chapter first.");
             return;
+        }
 
         _currentChapter.Content = ManuscriptEditor.Text;
-        _chapters.Update(_currentChapter);
+        bool saved = _chapters.Update(_currentChapter);
 
-        _lastSavedText = ManuscriptEditor.Text;
-        SaveStatusLabel.Text = "Saved";
-        AutosaveLabel.Text = $"♧  Saved at {DateTime.Now:HH:mm:ss}";
+        if (saved)
+        {
+            _savedText = ManuscriptEditor.Text;
+            SaveStatusLabel.Text = "Saved";
+            AutosaveLabel.Text = $"●  Saved at {DateTime.Now:HH:mm:ss}";
+        }
+        else
+        {
+            SaveStatusLabel.Text = "Save failed";
+            MessageBox.Show("The chapter could not be saved.",
+                "Save error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void SaveChapter_Click(object sender, RoutedEventArgs e)
@@ -175,7 +205,7 @@ public partial class MainWindow : Window
         if (!_loading && _currentChapter != null)
         {
             SaveStatusLabel.Text = "Unsaved";
-            AutosaveLabel.Text = "♧  Unsaved changes";
+            AutosaveLabel.Text = "●  Unsaved changes";
         }
     }
 
@@ -184,14 +214,17 @@ public partial class MainWindow : Window
         if (WordCountLabel == null || ManuscriptEditor == null)
             return;
 
-        int words = ManuscriptEditor.Text.Split(
+        int count = ManuscriptEditor.Text.Split(
             (char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
 
-        WordCountLabel.Text = $"Words: {words:N0}";
+        WordCountLabel.Text = $"Words: {count:N0}";
     }
 
     private void NewNovel_Click(object sender, RoutedEventArgs e)
     {
+        if (!ConfirmUnsavedChanges())
+            return;
+
         string? title = Ask("New Novel", "Enter your novel title:");
         if (string.IsNullOrWhiteSpace(title))
             return;
@@ -205,7 +238,7 @@ public partial class MainWindow : Window
             Description = ""
         });
 
-        var chapter = _chapters.Create(new Chapter
+        _chapters.Create(new Chapter
         {
             NovelId = novel.Id,
             ChapterNumber = 1,
@@ -214,9 +247,6 @@ public partial class MainWindow : Window
         });
 
         LoadNovels(novel.Id);
-
-        ChapterList.SelectedItem = _chapters.GetByNovel(novel.Id)
-            .FirstOrDefault(c => c.Id == chapter.Id);
     }
 
     private void NewChapter_Click(object sender, RoutedEventArgs e)
@@ -230,23 +260,28 @@ public partial class MainWindow : Window
         if (!ConfirmUnsavedChanges())
             return;
 
-        var existing = _chapters.GetByNovel(_currentNovel.Id);
-        int number = existing.Count == 0
+        var chapters = _chapters.GetByNovelId(_currentNovel.Id);
+        int number = chapters.Count == 0
             ? 1
-            : existing.Max(c => c.ChapterNumber) + 1;
+            : chapters.Max(c => c.ChapterNumber) + 1;
 
-        string title = Ask("New Chapter", $"Chapter {number} title:")
+        string title = Ask("New Chapter", $"Title for Chapter {number}:")
             ?? $"Chapter {number}";
 
         var chapter = _chapters.Create(new Chapter
         {
             NovelId = _currentNovel.Id,
             ChapterNumber = number,
-            Title = title
+            Title = title.Trim()
         });
 
         LoadNovel(_currentNovel);
+
+        _loading = true;
         ChapterList.SelectedItem = _chapters.GetById(chapter.Id);
+        _loading = false;
+
+        LoadChapter(chapter);
     }
 
     private static string? Ask(string title, string prompt)
@@ -254,9 +289,10 @@ public partial class MainWindow : Window
         var dialog = new Window
         {
             Title = title,
-            Width = 380,
-            Height = 160,
+            Width = 390,
+            Height = 180,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = Application.Current.MainWindow,
             Background = new SolidColorBrush(Color.FromRgb(8, 15, 27)),
             Foreground = Brushes.White,
             ResizeMode = ResizeMode.NoResize
@@ -269,7 +305,7 @@ public partial class MainWindow : Window
             Margin = new Thickness(0, 0, 0, 8)
         });
 
-        var input = new TextBox { Margin = new Thickness(0, 0, 0, 10) };
+        var input = new TextBox { Margin = new Thickness(0, 0, 0, 12) };
         panel.Children.Add(input);
 
         var buttons = new StackPanel
@@ -278,68 +314,79 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Right
         };
 
-        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 70 };
-        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 70 };
+        var ok = new Button
+        {
+            Content = "OK",
+            MinWidth = 75,
+            IsDefault = true
+        };
+        var cancel = new Button
+        {
+            Content = "Cancel",
+            MinWidth = 75,
+            IsCancel = true
+        };
 
         ok.Click += (_, _) => dialog.DialogResult = true;
-
         buttons.Children.Add(ok);
         buttons.Children.Add(cancel);
         panel.Children.Add(buttons);
-        dialog.Content = panel;
 
+        dialog.Content = panel;
         return dialog.ShowDialog() == true ? input.Text : null;
     }
 
     private void SelectLocalAI_Click(object sender, RoutedEventArgs e)
     {
-        _isOpenAI = false;
+        _openAISelected = false;
         _ai = new OllamaAIService();
-        ModelBoxReset();
+
+        LocalAIButton.BorderBrush =
+            new SolidColorBrush(Color.FromRgb(212, 175, 112));
+        OpenAIButton.ClearValue(Control.BorderBrushProperty);
+
         AddChatMessage("System",
-            "Local AI selected. Ensure Ollama is running and your model is installed.");
+            "Local AI selected. Make sure Ollama is running and the model is installed.");
     }
 
     private void SelectOpenAI_Click(object sender, RoutedEventArgs e)
     {
-        _isOpenAI = true;
-        ModelBoxReset();
-        AddChatMessage("System",
-            "OpenAI selected. Your API key will be requested when you send a message.");
-    }
+        _openAISelected = true;
 
-    private void ModelBoxReset()
-    {
-        // Provider selection is handled by the provider buttons.
-        // Model selection UI can be added to the toolbar in the next pass.
+        OpenAIButton.BorderBrush =
+            new SolidColorBrush(Color.FromRgb(212, 175, 112));
+        LocalAIButton.ClearValue(Control.BorderBrushProperty);
+
+        AddChatMessage("System",
+            "OpenAI selected. You'll be asked for your API key when you send a request.");
     }
 
     private async void SendMessage_Click(object sender, RoutedEventArgs e)
     {
         string message = ChatInput.Text.Trim();
-        if (message.Length == 0)
-            return;
-
-        if (!ConfirmUnsavedChanges())
+        if (string.IsNullOrWhiteSpace(message))
             return;
 
         ChatInput.Clear();
         AddChatMessage("You", message);
-        AddChatMessage("MythForge", "Thinking…");
+
+        var thinking = AddChatMessage("MythForge", "Thinking…");
 
         try
         {
-            if (_isOpenAI)
+            if (_openAISelected)
             {
                 if (string.IsNullOrWhiteSpace(_apiKey))
                 {
                     _apiKey = Ask("OpenAI API Key",
-                        "Enter your API key (kept in memory for this session):")?.Trim() ?? "";
+                        "Enter your API key. It will be kept in memory for this session.")
+                        ?.Trim() ?? "";
                 }
 
                 if (string.IsNullOrWhiteSpace(_apiKey))
                 {
-                    AddChatMessage("System", "OpenAI API key was not entered.");
+                    ChatMessages.Children.Remove(thinking);
+                    AddChatMessage("System", "No API key was entered.");
                     return;
                 }
 
@@ -353,23 +400,25 @@ public partial class MainWindow : Window
             string prompt = BuildStoryPrompt(message);
             string response = await _ai.GenerateResponseAsync(prompt);
 
+            ChatMessages.Children.Remove(thinking);
             AddChatMessage("MythForge", response);
-            AddChatMessage("Draft status",
-                "This response is a draft. It has not been inserted into your manuscript.");
+            AddChatMessage("Draft notice",
+                "This is an AI response only. It has not been inserted into your manuscript. Copy it into the editor only when you choose.");
         }
         catch (Exception ex)
         {
+            ChatMessages.Children.Remove(thinking);
             AddChatMessage("Error", ex.Message);
         }
     }
 
     private string BuildStoryPrompt(string message)
     {
-        var prompt = new System.Text.StringBuilder();
+        var prompt = new StringBuilder();
 
         prompt.AppendLine(
-            "You are MythForge, a novel-writing assistant. Respect the supplied canon.");
-        prompt.AppendLine($"Writing mode: {_mode}");
+            "You are MythForge, an AI novel-writing companion. Respect established canon.");
+        prompt.AppendLine($"Writing mode: {_writingMode}");
 
         if (_currentNovel != null)
         {
@@ -377,15 +426,16 @@ public partial class MainWindow : Window
             prompt.AppendLine($"Genre: {_currentNovel.Genre}");
             prompt.AppendLine($"Description: {_currentNovel.Description}");
 
-            prompt.AppendLine("CHARACTERS:");
-            foreach (var character in _characters.GetByNovel(_currentNovel.Id))
+            prompt.AppendLine("\nCHARACTERS:");
+            foreach (var character in _characters.GetByNovelId(_currentNovel.Id))
             {
                 prompt.AppendLine(
-                    $"{character.Name}: {character.Role}; {character.Personality}; " +
+                    $"{character.Name}; Role: {character.Role}; " +
+                    $"Personality: {character.Personality}; " +
                     $"Goals: {character.Goals}; Fears: {character.Fears}");
             }
 
-            prompt.AppendLine("APPROVED STORY NOTES:");
+            prompt.AppendLine("\nAPPROVED CANON NOTES:");
             foreach (var note in _notes.GetByNovel(_currentNovel.Id)
                          .Where(n => n.IsCanon))
             {
@@ -396,41 +446,42 @@ public partial class MainWindow : Window
 
         if (_currentChapter != null)
         {
-            prompt.AppendLine($"Current chapter: {_currentChapter.Title}");
-            prompt.AppendLine("Current manuscript context:");
+            prompt.AppendLine($"\nCurrent chapter: {_currentChapter.Title}");
+            prompt.AppendLine("Current manuscript:");
             prompt.AppendLine(ManuscriptEditor.Text);
         }
 
-        prompt.AppendLine("USER REQUEST:");
+        prompt.AppendLine("\nUSER REQUEST:");
         prompt.AppendLine(message);
         prompt.AppendLine(
-            "Return a separate draft. Never claim that you saved it.");
+            "\nReturn the requested text or advice as a draft. Do not claim to save or modify the manuscript.");
 
         return prompt.ToString();
     }
 
-    private void AddChatMessage(string speaker, string message)
+    private Border AddChatMessage(string speaker, string message)
     {
         var border = new Border
         {
             Background = new SolidColorBrush(
                 speaker == "You"
-                    ? Color.FromRgb(20, 34, 53)
-                    : Color.FromRgb(15, 25, 39)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(50, 48, 48)),
+                    ? Color.FromRgb(21, 34, 52)
+                    : Color.FromRgb(16, 27, 42)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(48, 59, 73)),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(9),
             Padding = new Thickness(11),
-            Margin = new Thickness(3, 5, 3, 8)
+            Margin = new Thickness(3, 5, 3, 7)
         };
 
         var panel = new StackPanel();
         panel.Children.Add(new TextBlock
         {
             Text = speaker,
-            Foreground = new SolidColorBrush(Color.FromRgb(213, 173, 112)),
+            Foreground = new SolidColorBrush(Color.FromRgb(212, 175, 112)),
             Margin = new Thickness(0, 0, 0, 5)
         });
+
         panel.Children.Add(new TextBlock
         {
             Text = message,
@@ -441,22 +492,26 @@ public partial class MainWindow : Window
         border.Child = panel;
         ChatMessages.Children.Add(border);
         ChatScrollViewer.ScrollToEnd();
+        return border;
     }
 
+    private void ClearChat_Click(object sender, RoutedEventArgs e)
+        => ChatMessages.Children.Clear();
+
     private void ContinueStory_Click(object sender, RoutedEventArgs e)
-        => SetQuickPrompt("Continue the current scene while respecting the saved story context.");
+        => SetQuickPrompt("Continue the current scene while respecting approved story canon.");
 
     private void AddDialogue_Click(object sender, RoutedEventArgs e)
-        => SetQuickPrompt("Write a dialogue-rich continuation using distinct character voices.");
+        => SetQuickPrompt("Write a dialogue-rich continuation with distinct character voices.");
 
     private void MakeDarker_Click(object sender, RoutedEventArgs e)
-        => SetQuickPrompt("Suggest a darker, more atmospheric continuation of this scene.");
+        => SetQuickPrompt("Make the scene darker and more atmospheric without contradicting canon.");
 
     private void ChangeSetting_Click(object sender, RoutedEventArgs e)
         => SetQuickPrompt("Suggest a setting change that fits the established world.");
 
     private void GiveMoreDetail_Click(object sender, RoutedEventArgs e)
-        => SetQuickPrompt("Expand the sensory detail without contradicting established canon.");
+        => SetQuickPrompt("Expand the sensory details while preserving the events and character motivations.");
 
     private void SetQuickPrompt(string prompt)
     {
@@ -467,7 +522,8 @@ public partial class MainWindow : Window
 
     private void Undo_Click(object sender, RoutedEventArgs e)
     {
-        if (_undo.Count == 0) return;
+        if (_undo.Count == 0)
+            return;
 
         _redo.Push(ManuscriptEditor.Text);
         _loading = true;
@@ -478,7 +534,8 @@ public partial class MainWindow : Window
 
     private void Redo_Click(object sender, RoutedEventArgs e)
     {
-        if (_redo.Count == 0) return;
+        if (_redo.Count == 0)
+            return;
 
         _undo.Push(ManuscriptEditor.Text);
         _loading = true;
@@ -487,30 +544,48 @@ public partial class MainWindow : Window
         UpdateWordCount();
     }
 
-    private void SceneMode_Click(object sender, RoutedEventArgs e)
-    {
-        _mode = _mode == "creative" ? "manual" : "creative";
-        MessageBox.Show($"Writing mode: {_mode}");
-    }
-
     private void FontSize_SelectionChanged(
         object sender, SelectionChangedEventArgs e)
     {
-        if (!IsInitialized || FontSizeSelector.SelectedItem is not ComboBoxItem item)
+        if (!IsInitialized ||
+            FontSizeSelector.SelectedItem is not ComboBoxItem item ||
+            !double.TryParse(item.Content?.ToString(), out double size))
             return;
 
-        if (double.TryParse(item.Content?.ToString(), out double size))
-            ManuscriptEditor.FontSize = size;
+        ManuscriptEditor.FontSize = size;
+    }
+
+    private void FontFamily_SelectionChanged(
+        object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsInitialized ||
+            FontFamilySelector.SelectedItem is not ComboBoxItem item ||
+            item.Content is not string family)
+            return;
+
+        ManuscriptEditor.FontFamily = new FontFamily(family);
     }
 
     private void Bold_Click(object sender, RoutedEventArgs e)
-        => MessageBox.Show("Rich-text formatting will be connected when the editor is upgraded to RichTextBox.");
+    {
+        ManuscriptEditor.FontWeight =
+            ManuscriptEditor.FontWeight == FontWeights.Bold
+                ? FontWeights.Normal : FontWeights.Bold;
+    }
 
     private void Italic_Click(object sender, RoutedEventArgs e)
-        => MessageBox.Show("Rich-text formatting will be connected when the editor is upgraded to RichTextBox.");
+    {
+        ManuscriptEditor.FontStyle =
+            ManuscriptEditor.FontStyle == FontStyles.Italic
+                ? FontStyles.Normal : FontStyles.Italic;
+    }
 
     private void Underline_Click(object sender, RoutedEventArgs e)
-        => MessageBox.Show("Rich-text formatting will be connected when the editor is upgraded to RichTextBox.");
+    {
+        ManuscriptEditor.TextDecorations =
+            ManuscriptEditor.TextDecorations == TextDecorations.Underline
+                ? null : TextDecorations.Underline;
+    }
 
     private void AlignLeft_Click(object sender, RoutedEventArgs e)
         => ManuscriptEditor.TextAlignment = TextAlignment.Left;
@@ -523,17 +598,25 @@ public partial class MainWindow : Window
         MessageBox.Show(
             $"Novel: {_currentNovel?.Title ?? "None"}\n" +
             $"Chapters: {ChapterList.Items.Count}\n" +
-            $"Current chapter words: {words}");
+            $"Current chapter words: {words}",
+            "Dashboard");
     }
 
     private void NovelOverview_Click(object sender, RoutedEventArgs e)
     {
-        if (_currentNovel == null) return;
+        if (_currentNovel == null)
+        {
+            MessageBox.Show("Create or select a novel first.");
+            return;
+        }
 
-        _currentNovel.Description =
-            Ask("Novel Overview", "Enter the novel description:")
-            ?? _currentNovel.Description;
+        string? description = Ask(
+            "Novel Overview", "Enter the novel description:");
 
+        if (description == null)
+            return;
+
+        _currentNovel.Description = description;
         _novels.Update(_currentNovel);
     }
 
@@ -549,7 +632,8 @@ public partial class MainWindow : Window
         }
 
         string? name = Ask("Character Design", "Character name:");
-        if (string.IsNullOrWhiteSpace(name)) return;
+        if (string.IsNullOrWhiteSpace(name))
+            return;
 
         var character = new Character
         {
@@ -586,13 +670,16 @@ public partial class MainWindow : Window
         }
 
         string? title = Ask(category, "Entry title:");
-        if (string.IsNullOrWhiteSpace(title)) return;
+        if (string.IsNullOrWhiteSpace(title))
+            return;
 
-        string content = Ask(category, "Entry details:") ?? "";
+        string? content = Ask(category, "Entry details:");
+        if (content == null)
+            return;
 
-        bool isCanon = MessageBox.Show(
-            "Mark this entry as approved story canon?",
-            "Canon confirmation",
+        bool canon = MessageBox.Show(
+            "Is this an approved fact in your story?",
+            "Approve as canon",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question) == MessageBoxResult.Yes;
 
@@ -602,16 +689,19 @@ public partial class MainWindow : Window
             Category = category,
             Title = title.Trim(),
             Content = content,
-            IsCanon = isCanon
+            IsCanon = canon
         });
 
         MessageBox.Show($"{category} entry saved.");
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e)
-        => MessageBox.Show(
-            "Settings will be expanded in a later stage. " +
-            "The current UI reference remains the design target.");
+    {
+        MessageBox.Show(
+            "Choose OpenAI or Local AI from the top toolbar. " +
+            "OpenAI asks for an API key when you first send a request.",
+            "Settings");
+    }
 
     protected override void OnClosing(
         System.ComponentModel.CancelEventArgs e)
