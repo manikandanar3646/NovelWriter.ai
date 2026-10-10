@@ -1,7 +1,6 @@
 using AI_Novel_writing_System.Data;
 using AI_Novel_writing_System.Models;
 using AI_Novel_writing_System.Services;
-using darkFanNovel;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,11 +30,10 @@ public partial class MainWindow : Window
     private string _apiKey = string.Empty;
     private string _writingMode = "creative";
     private string _savedText = string.Empty;
+    private string _lastEditorText = string.Empty;
 
     private readonly Stack<string> _undo = new();
     private readonly Stack<string> _redo = new();
-
-    private string _lastEditorText = string.Empty;
 
     public MainWindow()
     {
@@ -62,11 +60,9 @@ public partial class MainWindow : Window
             List<Novel> novels = _novels.GetAll();
 
             NovelSelector.ItemsSource = novels;
-
             NovelSelector.SelectedItem =
                 novels.FirstOrDefault(n => n.Id == preferredId)
                 ?? novels.FirstOrDefault();
-
         }
         catch (Exception ex)
         {
@@ -91,13 +87,19 @@ public partial class MainWindow : Window
             _currentChapter = null;
 
             ChapterList.ItemsSource = null;
+
+            _loading = true;
             ManuscriptEditor.Clear();
+            _loading = false;
 
             CurrentChapterTitle.Text = "Create a novel to begin";
             ChapterSubheading.Text = "No novel selected";
 
             _savedText = string.Empty;
             _lastEditorText = string.Empty;
+
+            _undo.Clear();
+            _redo.Clear();
 
             UpdateWordCount();
             UpdateSaveStatus();
@@ -113,7 +115,8 @@ public partial class MainWindow : Window
 
         try
         {
-            List<Chapter> chapters = _chapters.GetByNovelId(novel.Id);
+            List<Chapter> chapters =
+                _chapters.GetByNovelId(novel.Id);
 
             ChapterList.ItemsSource = chapters;
             ChapterList.SelectedItem = chapters.FirstOrDefault();
@@ -146,6 +149,7 @@ public partial class MainWindow : Window
             _loading = false;
 
             CurrentChapterTitle.Text = novel.Title;
+
             _savedText = string.Empty;
             _lastEditorText = string.Empty;
 
@@ -244,7 +248,7 @@ public partial class MainWindow : Window
         if (answer == MessageBoxResult.No)
             return true;
 
-        return SaveCurrentChapter(showMessage: true);
+        return SaveCurrentChapter();
     }
 
     private bool SaveCurrentChapter(bool showMessage = true)
@@ -252,13 +256,7 @@ public partial class MainWindow : Window
         if (_currentChapter == null)
         {
             if (showMessage)
-            {
-                MessageBox.Show(
-                    "Create or select a chapter first.",
-                    "No Chapter Selected",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
+                MessageBox.Show("Create or select a chapter first.");
 
             return false;
         }
@@ -276,7 +274,8 @@ public partial class MainWindow : Window
                 if (showMessage)
                 {
                     MessageBox.Show(
-                        "The chapter could not be saved. Your editor content has been kept.",
+                        "The chapter could not be saved. " +
+                        "Your editor content has been kept.",
                         "Save Error",
                         MessageBoxButton.OK,
                         MessageBoxImage.Error);
@@ -445,21 +444,22 @@ public partial class MainWindow : Window
                 ? $"Chapter {number}"
                 : titleInput.Trim();
 
+            int novelId = _currentNovel.Id;
+
             Chapter chapter = _chapters.Create(new Chapter
             {
-                NovelId = _currentNovel.Id,
+                NovelId = novelId,
                 ChapterNumber = number,
                 Title = chapterTitle,
                 Content = string.Empty
             });
 
-            int novelId = _currentNovel.Id;
+            Novel novel = _currentNovel;
 
-            LoadNovel(_currentNovel);
+            LoadNovel(novel);
 
             _loading = true;
-            ChapterList.SelectedItem =
-                _chapters.GetById(chapter.Id);
+            ChapterList.SelectedItem = chapter;
             _loading = false;
 
             LoadChapter(chapter);
@@ -616,7 +616,6 @@ public partial class MainWindow : Window
                 await _ai.GenerateResponseAsync(prompt);
 
             ChatMessages.Children.Remove(thinking);
-
             AddChatMessage("MythForge", response);
 
             AddChatMessage(
@@ -811,7 +810,7 @@ public partial class MainWindow : Window
         UpdateWordCount();
         UpdateSaveStatus();
     }
-
+    
     private void FontSize_SelectionChanged(
         object sender,
         SelectionChangedEventArgs e)
@@ -905,7 +904,8 @@ public partial class MainWindow : Window
 
             if (!_novels.Update(_currentNovel))
             {
-                MessageBox.Show("The novel description could not be saved.");
+                MessageBox.Show(
+                    "The novel description could not be saved.");
             }
         }
         catch (Exception ex)
