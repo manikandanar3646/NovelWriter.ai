@@ -21,4 +21,3 @@ public class StoryNote
 
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }
-
