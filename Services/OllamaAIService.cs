@@ -1,11 +1,12 @@
-﻿using AI_Novel_writing_System;
+﻿
+using AI_Novel_writing_System;
 using System;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace darkFanNovel
+namespace AI_Novel_writing_System.Services
 {
     public class OllamaAIService : IAIService
     {
@@ -22,6 +23,11 @@ namespace darkFanNovel
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(prompt))
+                {
+                    return "Please enter a prompt for your novel.";
+                }
+
                 var requestData = new
                 {
                     model = model,
@@ -31,46 +37,51 @@ namespace darkFanNovel
 
                 string json = JsonSerializer.Serialize(requestData);
 
-                var content = new StringContent(
+                using var content = new StringContent(
                     json,
                     Encoding.UTF8,
                     "application/json"
                 );
 
-                var response = await http.PostAsync(
+                using var response = await http.PostAsync(
                     "http://localhost:11434/api/generate",
                     content
                 );
 
-                if (!response.IsSuccessStatusCode)
-                {
-                    return $"❌ Ollama Error: {response.StatusCode}";
-                }
-
                 string responseText =
                     await response.Content.ReadAsStringAsync();
 
-                using var doc =
-                    JsonDocument.Parse(responseText);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return $"Ollama error: {(int)response.StatusCode} " +
+                           $"{response.ReasonPhrase}\n{responseText}";
+                }
+
+                using var doc = JsonDocument.Parse(responseText);
 
                 if (doc.RootElement.TryGetProperty(
                     "response",
                     out JsonElement resp))
                 {
                     return resp.GetString()
-                           ?? "⚠️ Empty response from Llama.";
+                           ?? "Empty response from the local model.";
                 }
 
-                return "⚠️ Ollama did not return a valid response.";
+                return "Ollama did not return a valid response.";
             }
             catch (HttpRequestException)
             {
-                return "❌ Cannot connect to Ollama.\n\n" +
-                       "Make sure Ollama is running and the Llama model is installed.";
+                return "Cannot connect to Ollama.\n\n" +
+                       "Make sure Ollama is running and the llama3.1 model is installed.";
+            }
+            catch (TaskCanceledException)
+            {
+                return "The Ollama request timed out. " +
+                       "The model may be taking too long to respond.";
             }
             catch (Exception ex)
             {
-                return $"❌ Ollama Error: {ex.Message}";
+                return $"Ollama error: {ex.Message}";
             }
         }
     }

@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace darkFanNovel
+namespace AI_Novel_writing_System.Services
 {
     public class OpenAIService : IAIService
     {
