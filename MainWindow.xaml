@@ -1,9 +1,11 @@
 <Window x:Class="AI_Novel_writing_System.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AI Novel Writing System"
-        Width="1500" Height="900"
-        MinWidth="1100" MinHeight="680"
+        Title="AI Novel Writing System — MythForge"
+        Width="1500"
+        Height="900"
+        MinWidth="1100"
+        MinHeight="680"
         WindowStartupLocation="CenterScreen"
         Background="#050B15"
         Foreground="#E9E0D0"
@@ -15,7 +17,7 @@
         <SolidColorBrush x:Key="GoldBrush" Color="#D4AF70"/>
         <SolidColorBrush x:Key="MutedBrush" Color="#9CA6B5"/>
 
-        <Style TargetType="Button">
+        <Style TargetType="{x:Type Button}">
             <Setter Property="Foreground" Value="#E9E0D0"/>
             <Setter Property="Background" Value="#101A29"/>
             <Setter Property="BorderBrush" Value="#394252"/>
@@ -26,14 +28,16 @@
             <Setter Property="FontFamily" Value="Georgia"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="Button">
+                    <ControlTemplate TargetType="{x:Type Button}">
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8"
                                 Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
+                            <ContentPresenter
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True"/>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -43,29 +47,39 @@
                     <Setter Property="BorderBrush" Value="#D4AF70"/>
                     <Setter Property="Background" Value="#1A2636"/>
                 </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.5"/>
+                </Trigger>
             </Style.Triggers>
         </Style>
 
-        <Style TargetType="TextBox">
+        <Style TargetType="{x:Type TextBox}">
             <Setter Property="Background" Value="#0A1220"/>
             <Setter Property="Foreground" Value="#EEE7DB"/>
             <Setter Property="BorderBrush" Value="#374354"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8"/>
             <Setter Property="CaretBrush" Value="#D4AF70"/>
+            <Setter Property="SelectionBrush" Value="#806D4D"/>
         </Style>
 
-        <Style TargetType="ComboBox">
+        <Style TargetType="{x:Type ComboBox}">
             <Setter Property="Background" Value="#111B2A"/>
             <Setter Property="Foreground" Value="#EEE7DB"/>
             <Setter Property="BorderBrush" Value="#4C4B49"/>
             <Setter Property="Padding" Value="5"/>
         </Style>
 
-        <Style TargetType="TextBlock" x:Key="SectionHeading">
+        <Style x:Key="SectionHeading"
+               TargetType="{x:Type TextBlock}">
             <Setter Property="Foreground" Value="#D4AF70"/>
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="Margin" Value="4,5,4,10"/>
+        </Style>
+
+        <Style TargetType="{x:Type Separator}">
+            <Setter Property="Background" Value="#343B46"/>
+            <Setter Property="Height" Value="1"/>
         </Style>
     </Window.Resources>
 
@@ -93,11 +107,13 @@
                                Foreground="#D4AF70"
                                FontSize="36"
                                Margin="0,0,14,0"/>
+
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="MythForge"
                                    Foreground="#E5C28B"
                                    FontSize="25"
                                    FontWeight="Bold"/>
+
                         <TextBlock Text="AI Novel Writing System"
                                    Foreground="#AFA18C"
                                    FontSize="11"/>
@@ -110,8 +126,10 @@
                             VerticalAlignment="Center">
                     <Button Content="◎  World Builder"
                             Click="WorldBuilder_Click"/>
+
                     <Button Content="♙  Character Design"
                             Click="Characters_Click"/>
+
                     <Button Content="♧  Plot Connections"
                             Click="PlotConnections_Click"/>
                 </StackPanel>
@@ -123,10 +141,12 @@
                     <Button x:Name="OpenAIButton"
                             Content="☁  OpenAI"
                             Click="SelectOpenAI_Click"/>
+
                     <Button x:Name="LocalAIButton"
                             Content="▣  Local AI"
                             BorderBrush="#D4AF70"
                             Click="SelectLocalAI_Click"/>
+
                     <Button Content="⚙"
                             ToolTip="Settings"
                             Click="Settings_Click"/>
@@ -150,45 +170,56 @@
                     BorderThickness="1"
                     CornerRadius="9"
                     Margin="0,0,3,0">
+
                 <DockPanel Margin="10">
                     <StackPanel DockPanel.Dock="Top">
                         <TextBlock Text="MY NOVELS"
                                    Style="{StaticResource SectionHeading}"/>
+
                         <ComboBox x:Name="NovelSelector"
                                   DisplayMemberPath="Title"
                                   SelectionChanged="NovelSelector_SelectionChanged"
                                   Margin="0,0,0,8"/>
+
                         <Button Content="+  New Novel"
                                 HorizontalContentAlignment="Left"
                                 Click="NewNovel_Click"/>
-                        <Separator Margin="0,10"
-                                   Background="#343B46"/>
+
+                        <Separator Margin="0,10"/>
 
                         <Button Content="⌂  Dashboard"
                                 HorizontalContentAlignment="Left"
                                 Click="Dashboard_Click"/>
+
                         <Button Content="▤  Novel Overview"
                                 HorizontalContentAlignment="Left"
                                 Click="NovelOverview_Click"/>
+
                         <Button Content="▣  Chapters"
                                 HorizontalContentAlignment="Left"
                                 BorderBrush="#A9864D"
                                 Click="Chapters_Click"/>
+
                         <Button Content="♙  Characters"
                                 HorizontalContentAlignment="Left"
                                 Click="Characters_Click"/>
+
                         <Button Content="◎  World Building"
                                 HorizontalContentAlignment="Left"
                                 Click="WorldBuilder_Click"/>
+
                         <Button Content="☷  Timeline"
                                 HorizontalContentAlignment="Left"
                                 Click="Timeline_Click"/>
+
                         <Button Content="♧  Plot Threads"
                                 HorizontalContentAlignment="Left"
                                 Click="PlotConnections_Click"/>
+
                         <Button Content="▤  Research Notes"
                                 HorizontalContentAlignment="Left"
                                 Click="ResearchNotes_Click"/>
+
                         <Button Content="⚙  Settings"
                                 HorizontalContentAlignment="Left"
                                 Click="Settings_Click"/>
@@ -210,18 +241,23 @@
                     BorderThickness="1"
                     CornerRadius="9"
                     Margin="3,0">
+
                 <DockPanel Margin="8">
-                    <Grid DockPanel.Dock="Top" Margin="3,4,3,12">
+                    <Grid DockPanel.Dock="Top"
+                          Margin="3,4,3,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
+
                         <TextBlock Text="Chapters"
                                    FontSize="17"
                                    VerticalAlignment="Center"/>
+
                         <Button Grid.Column="1"
                                 Content="+"
                                 Padding="9,3"
+                                ToolTip="Create chapter"
                                 Click="NewChapter_Click"/>
                     </Grid>
 
@@ -239,30 +275,37 @@
                              Foreground="#E8E0D3"
                              DisplayMemberPath="Title"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+
                         <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
+                            <Style TargetType="{x:Type ListBoxItem}">
                                 <Setter Property="Padding" Value="8"/>
                                 <Setter Property="Margin" Value="0,2"/>
                                 <Setter Property="Foreground" Value="#E8E0D3"/>
                                 <Setter Property="Background" Value="Transparent"/>
+
                                 <Setter Property="Template">
                                     <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
+                                        <ControlTemplate TargetType="{x:Type ListBoxItem}">
                                             <Border x:Name="ItemBorder"
                                                     Background="{TemplateBinding Background}"
                                                     CornerRadius="6"
                                                     Padding="{TemplateBinding Padding}">
-                                                <ContentPresenter/>
+                                                <ContentPresenter
+                                                    VerticalAlignment="Center"/>
                                             </Border>
+
                                             <ControlTemplate.Triggers>
-                                                <Trigger Property="IsSelected" Value="True">
+                                                <Trigger Property="IsSelected"
+                                                         Value="True">
                                                     <Setter TargetName="ItemBorder"
                                                             Property="Background"
                                                             Value="#30291F"/>
                                                     <Setter Property="Foreground"
                                                             Value="#E5C28B"/>
                                                 </Trigger>
-                                                <Trigger Property="IsMouseOver" Value="True">
+
+                                                <Trigger Property="IsMouseOver"
+                                                         Value="True">
                                                     <Setter TargetName="ItemBorder"
                                                             Property="Background"
                                                             Value="#192333"/>
@@ -285,6 +328,7 @@
                     CornerRadius="9"
                     Margin="3,0"
                     ClipToBounds="True">
+
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="48"/>
@@ -293,18 +337,23 @@
                         <RowDefinition Height="34"/>
                     </Grid.RowDefinitions>
 
-                    <Border Background="#101723"
+                    <!-- CHAPTER HEADER -->
+                    <Border Grid.Row="0"
+                            Background="#101723"
                             BorderBrush="#34343C"
                             BorderThickness="0,0,0,1">
+
                         <DockPanel Margin="10,0">
+                            <Button DockPanel.Dock="Right"
+                                    Content="Save"
+                                    Click="SaveChapter_Click"/>
+
                             <TextBlock x:Name="CurrentChapterTitle"
                                        Text="Create a novel to begin"
                                        VerticalAlignment="Center"
                                        Foreground="#E5C28B"
-                                       FontSize="15"/>
-                            <Button DockPanel.Dock="Right"
-                                    Content="Save"
-                                    Click="SaveChapter_Click"/>
+                                       FontSize="15"
+                                       TextTrimming="CharacterEllipsis"/>
                         </DockPanel>
                     </Border>
 
@@ -313,58 +362,76 @@
                             Background="#151719"
                             BorderBrush="#34343C"
                             BorderThickness="0,0,0,1">
-                        <StackPanel Orientation="Horizontal"
-                                    VerticalAlignment="Center"
-                                    Margin="5,0">
-                            <Button Content="↶"
-                                    ToolTip="Undo"
-                                    Click="Undo_Click"/>
-                            <Button Content="↷"
-                                    ToolTip="Redo"
-                                    Click="Redo_Click"/>
 
-                            <ComboBox x:Name="FontFamilySelector"
-                                      Width="100"
-                                      SelectedIndex="0"
-                                      SelectionChanged="FontFamily_SelectionChanged"
-                                      Margin="3">
-                                <ComboBoxItem Content="Georgia"/>
-                                <ComboBoxItem Content="Times New Roman"/>
-                                <ComboBoxItem Content="Palatino Linotype"/>
-                                <ComboBoxItem Content="Cambria"/>
-                            </ComboBox>
-
-                            <ComboBox x:Name="FontSizeSelector"
-                                      Width="58"
-                                      SelectedIndex="2"
-                                      SelectionChanged="FontSize_SelectionChanged"
-                                      Margin="3">
-                                <ComboBoxItem Content="12"/>
-                                <ComboBoxItem Content="14"/>
-                                <ComboBoxItem Content="16"/>
-                                <ComboBoxItem Content="18"/>
-                                <ComboBoxItem Content="20"/>
-                                <ComboBoxItem Content="24"/>
-                            </ComboBox>
-
-                            <Button Content="B" FontWeight="Bold"
-                                    Click="Bold_Click"/>
-                            <Button Content="I" FontStyle="Italic"
-                                    Click="Italic_Click"/>
-                            <Button Content="U"
-                                    Click="Underline_Click"/>
-                            <Button Content="☰"
-                                    ToolTip="Align left"
-                                    Click="AlignLeft_Click"/>
-
+                        <DockPanel LastChildFill="True">
                             <TextBlock x:Name="WordCountLabel"
+                                       DockPanel.Dock="Right"
                                        Text="Words: 0"
                                        VerticalAlignment="Center"
                                        Margin="8,0"
                                        Foreground="#D6C5A6"/>
-                        </StackPanel>
+
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Disabled">
+                                <StackPanel Orientation="Horizontal"
+                                            VerticalAlignment="Center"
+                                            Margin="5,0">
+
+                                    <Button Content="↶"
+                                            ToolTip="Undo"
+                                            Click="Undo_Click"/>
+
+                                    <Button Content="↷"
+                                            ToolTip="Redo"
+                                            Click="Redo_Click"/>
+
+                                    <ComboBox x:Name="FontFamilySelector"
+                                              Width="100"
+                                              SelectedIndex="0"
+                                              SelectionChanged="FontFamily_SelectionChanged"
+                                              Margin="3">
+                                        <ComboBoxItem Content="Georgia"/>
+                                        <ComboBoxItem Content="Times New Roman"/>
+                                        <ComboBoxItem Content="Palatino Linotype"/>
+                                        <ComboBoxItem Content="Cambria"/>
+                                    </ComboBox>
+
+                                    <ComboBox x:Name="FontSizeSelector"
+                                              Width="58"
+                                              SelectedIndex="2"
+                                              SelectionChanged="FontSize_SelectionChanged"
+                                              Margin="3">
+                                        <ComboBoxItem Content="12"/>
+                                        <ComboBoxItem Content="14"/>
+                                        <ComboBoxItem Content="16"/>
+                                        <ComboBoxItem Content="18"/>
+                                        <ComboBoxItem Content="20"/>
+                                        <ComboBoxItem Content="24"/>
+                                    </ComboBox>
+
+                                    <Button Content="B"
+                                            FontWeight="Bold"
+                                            ToolTip="Bold"
+                                            Click="Bold_Click"/>
+
+                                    <Button Content="I"
+                                            FontStyle="Italic"
+                                            ToolTip="Italic"
+                                            Click="Italic_Click"/>
+
+                                    <Button Content="U"
+                                            ToolTip="Underline"
+                                            Click="Underline_Click"/>
+
+                                    <Button Content="☰"
+                                            ToolTip="Align left"
+                                            Click="AlignLeft_Click"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </DockPanel>
                     </Border>
 
+                    <!-- MANUSCRIPT TEXT -->
                     <TextBox x:Name="ManuscriptEditor"
                              Grid.Row="2"
                              TextChanged="ManuscriptEditor_TextChanged"
@@ -378,19 +445,21 @@
                              Foreground="#E8E0D7"
                              FontFamily="Georgia"
                              FontSize="17"
-                             LineHeight="31"
                              Padding="28,26"
                              SpellCheck.IsEnabled="True"/>
 
+                    <!-- EDITOR STATUS -->
                     <Border Grid.Row="3"
                             Background="#0C1119"
                             BorderBrush="#34343C"
                             BorderThickness="0,1,0,0">
+
                         <DockPanel Margin="10,0">
                             <TextBlock x:Name="AutosaveLabel"
                                        Text="●  Ready"
                                        Foreground="#B8AA92"
                                        VerticalAlignment="Center"/>
+
                             <TextBlock x:Name="SaveStatusLabel"
                                        Text="Saved"
                                        DockPanel.Dock="Right"
@@ -408,6 +477,7 @@
                     BorderThickness="1"
                     CornerRadius="9"
                     Margin="3,0,0,0">
+
                 <Grid Margin="9">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="45"/>
@@ -416,21 +486,25 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
+                    <!-- AI HEADER -->
                     <DockPanel Grid.Row="0">
-                        <TextBlock Text="☷  AI Companion"
-                                   Foreground="#E5C28B"
-                                   FontSize="17"
-                                   VerticalAlignment="Center"/>
                         <Button DockPanel.Dock="Right"
                                 Content="Clear"
                                 Padding="7,3"
                                 Click="ClearChat_Click"/>
+
+                        <TextBlock Text="☷  AI Companion"
+                                   Foreground="#E5C28B"
+                                   FontSize="17"
+                                   VerticalAlignment="Center"/>
                     </DockPanel>
 
+                    <!-- CHAT HISTORY -->
                     <ScrollViewer x:Name="ChatScrollViewer"
                                   Grid.Row="1"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
+
                         <StackPanel x:Name="ChatMessages">
                             <Border Background="#111C2A"
                                     BorderBrush="#2C394A"
@@ -438,31 +512,42 @@
                                     CornerRadius="9"
                                     Padding="12"
                                     Margin="3,6">
+
                                 <TextBlock TextWrapping="Wrap"
-                                           LineHeight="21"
                                            Text="Welcome to MythForge! I can help with your story using the selected novel, characters, and approved notes. Generated text remains a draft until you choose to insert it."/>
                             </Border>
                         </StackPanel>
                     </ScrollViewer>
 
-                    <WrapPanel Grid.Row="2" Margin="0,8">
+                    <!-- QUICK PROMPTS -->
+                    <WrapPanel Grid.Row="2"
+                               Margin="0,8">
+
                         <Button Content="Continue the story"
                                 Click="ContinueStory_Click"/>
+
                         <Button Content="Add dialogue"
                                 Click="AddDialogue_Click"/>
+
                         <Button Content="Make it darker"
                                 Click="MakeDarker_Click"/>
+
                         <Button Content="Change setting"
                                 Click="ChangeSetting_Click"/>
+
                         <Button Content="More detail"
                                 Click="GiveMoreDetail_Click"/>
                     </WrapPanel>
 
-                    <Grid Grid.Row="3" Margin="0,8,0,0">
+                    <!-- CHAT INPUT -->
+                    <Grid Grid.Row="3"
+                          Margin="0,8,0,0">
+
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="48"/>
                         </Grid.ColumnDefinitions>
+
                         <TextBox x:Name="ChatInput"
                                  MinHeight="70"
                                  MaxHeight="150"
@@ -471,9 +556,11 @@
                                  VerticalScrollBarVisibility="Auto"
                                  VerticalContentAlignment="Center"
                                  ToolTip="Ask your AI writing companion"/>
+
                         <Button Grid.Column="1"
                                 Content="➤"
                                 FontSize="18"
+                                ToolTip="Send message"
                                 Click="SendMessage_Click"/>
                     </Grid>
                 </Grid>
