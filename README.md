@@ -77,12 +77,12 @@ The original meaning of the user's text is preserved.
 The project uses an abstraction-based AI architecture so that different AI providers can be used without changing the main application logic.
 
 ```text
-                    AI Novel Writing System
-                              │
-                       AI Provider
-                       /          \
-                      /            \
-             Local AI              Cloud AI
+                AI Novel Writing System
+                          │
+                      AI Provider  
+                     /          \
+                    /            \
+             Local AI             Cloud AI
                 │                     │
              Ollama               OpenAI API
                 │                     │
